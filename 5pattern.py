@@ -239,8 +239,13 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
     headers['authorization'] = CURRENT_TOKEN
 
     json_data = {
-        'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
-        'random': '', 'signature': '', 'timestamp': 1772984986,
+        'pageSize': 10,
+        'pageNo': 1,
+        'typeId': 30,
+        'language': 7,
+        'random': 'dce1d4e948ae4f39a209e110d65afd43',
+        'signature': 'F53CF072A859F801F6B02B0C3FCDFCD6',
+        'timestamp': 1773196269,
     }
 
     data = await fetch_with_retry(session, 'https://api.bigwinqaz.com/api/webapi/GetNoaverageEmerdList', headers, json_data)
