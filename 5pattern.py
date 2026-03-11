@@ -383,10 +383,10 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
 
     # ⚡ ချက်ချင်းအချိန်ဆွဲယူမည့် Function
     def get_realtime_caption():
-        sec_left = 30 - (int(time.time()) % 30)
-        if sec_left == 30: sec_left = 0 # ၃၀ စက္ကန့်ပြည့်ချိန်တွင် 0s ဟုပြရန်
+        sec_left = 60 - (int(time.time()) % 60)
+        if sec_left == 60: sec_left = 0 # ၃၀ စက္ကန့်ပြည့်ချိန်တွင် 0s ဟုပြရန်
         return (
-            f"<b>WIN GO 30 SECONDS</b>\n"
+            f"<b>WIN GO 60 SECONDS</b>\n"
             f"⏰ Next Result In: <b>{sec_left}s</b>\n\n"
             f"{table_str}\n"
             f"🅿️ <b>Period:</b> {next_issue[:3]}**{next_issue[-4:]}\n"
