@@ -31,13 +31,13 @@ load_dotenv()
 # ==========================================
 # ⚙️ 1. CONFIGURATION
 # ==========================================
-NAME = os.getenv("BIGWIN_USERNAME")
+USERNAME = os.getenv("BIGWIN_USERNAME")
 PASSWORD = os.getenv("BIGWIN_PASSWORD")
 TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
 TELEGRAM_CHANNEL_ID = os.getenv("CHANNEL_ID")
 MONGO_URI = os.getenv("MONGO_URI") 
 
-if not all([NAME, PASSWORD, TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID, MONGO_URI]):
+if not all([USERNAME, PASSWORD, TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID, MONGO_URI]):
     print("❌ Error: .env ဖိုင်ထဲတွင် အချက်အလက်များ ပြည့်စုံစွာ မပါဝင်ပါ။")
     exit()
   
@@ -91,10 +91,16 @@ async def fetch_with_retry(session, url, headers, json_data, retries=3):
 async def login_and_get_token(session: aiohttp.ClientSession):
     global CURRENT_TOKEN
     json_data = {
-        'username': 'NAME', 'pwd': 'PASSWORD', 'phonetype': 1, 'logintype': 'mobile',
-        'packId': '', 'deviceId': '51ed4ee0f338a1bb24063ffdfcd31ce6', 'language': 7,
-        'random': 'e9a8246ddf1e4514955ada53ef50bdc0', 'signature': '872204F85DDA09B5E7BFAFD9FECC402E',
-        'timestamp': 1772984986,
+        'username': '959680090540',
+        'pwd': 'Mitheint11',
+        'phonetype': 1,
+        'logintype': 'mobile',
+        'packId': '',
+        'deviceId': '51ed4ee0f338a1bb24063ffdfcd31ce6',
+        'language': 7,
+        'random': '452fa309995244de92103c0afbefbe9a',
+        'signature': '202C655177E9187D427A26F3CDC00A52',
+        'timestamp': 1773021618,
     }
     data = await fetch_with_retry(session, 'https://api.bigwinqaz.com/api/webapi/Login', BASE_HEADERS, json_data)
     if data and data.get('code') == 0:
