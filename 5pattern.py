@@ -3,6 +3,7 @@ import time
 import os
 import io
 import json
+import traceback
 from datetime import datetime
 from dotenv import load_dotenv
 import aiohttp
@@ -31,33 +32,44 @@ load_dotenv()
 # ==========================================
 # ⚙️ 1. CONFIGURATION
 # ==========================================
-USERNAME = os.getenv("SIXLOTTERY_USERNAME")
-PASSWORD = os.getenv("SIXLOTTERY_PASSWORD")
+USERNAME = os.getenv("SIXLOTTERY_USERNAME", "959675323878")
+PASSWORD = os.getenv("SIXLOTTERY_PASSWORD", "Mitheint11")
 TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
 TELEGRAM_CHANNEL_ID = os.getenv("CHANNEL_ID")
 MONGO_URI = os.getenv("MONGO_URI") 
 
-if not all([USERNAME, PASSWORD, TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID, MONGO_URI]):
+if not all([TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID, MONGO_URI]):
     print("❌ Error: .env ဖိုင်ထဲတွင် အချက်အလက်များ ပြည့်စုံစွာ မပါဝင်ပါ။")
     exit()
-  
+
+# 🔑========================================🔑
+# 🚨 6WIN API လုံခြုံရေးသော့များ (Win Go 30s)
+# 🔑========================================🔑
+LOGIN_RANDOM = "e98c09a1f15949f99403c27d9fc45dfa"
+LOGIN_SIGNATURE = "C5118DA49746AF4504F6C4967C5C50B4"
+LOGIN_TIMESTAMP = 1773236871
+
+# 👇 ဇယားဆွဲမည့် သော့ (၅ မိနစ်ပြည့်တိုင်း ဤနေရာတွင် Manual လာလဲပေးရပါမည်) 👇
+DATA_RANDOM = "ff5adfece70a45c2b5152b2526b50a3a"
+DATA_SIGNATURE = "40D308D7D2D214B247B6CF480E1FB85D"
+DATA_TIMESTAMP = 1773237062
+# ============================================
+
 bot = Bot(token=TELEGRAM_BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
-# MongoDB Setup
+# 💡 6Win 30 Seconds အတွက် သီးသန့် Database 
 db_client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
-db = db_client['sixlottery_database'] 
-history_collection = db['game_history'] 
-predictions_collection = db['predictions'] 
+db = db_client['bigwin_database'] 
+history_collection = db['6lottery_wingo30_history'] 
+predictions_collection = db['6lottery_wingo30_predictions'] 
 
-# ==========================================
-# 🔧 2. SYSTEM VARIABLES 
-# ==========================================
 CURRENT_TOKEN = ""
 LAST_PROCESSED_ISSUE = None
 MAIN_MESSAGE_ID = None 
 SESSION_START_ISSUE = None 
 LAST_CAPTION_EDIT_TIME = 0 
+LAST_HEARTBEAT = time.time()
 
 BASE_HEADERS = {
     'authority': '6lotteryapi.com',
@@ -72,13 +84,10 @@ async def init_db():
     try:
         await history_collection.create_index("issue_number", unique=True)
         await predictions_collection.create_index("issue_number", unique=True)
-        print("🗄 MongoDB ချိတ်ဆက်မှု အောင်မြင်ပါသည်။ (⏱️ Zero-Latency Timer Enabled)")
+        print("🗄 MongoDB ချိတ်ဆက်မှု အောင်မြင်ပါသည်။ (🚀 6WIN 30-Seconds Edition)")
     except Exception as e:
-        pass
+        print(f"❌ MongoDB Error: {e}")
 
-# ==========================================
-# 🔑 3. ASYNC API FUNCTIONS
-# ==========================================
 async def fetch_with_retry(session, url, headers, json_data, retries=3):
     for attempt in range(retries):
         try:
@@ -91,22 +100,22 @@ async def fetch_with_retry(session, url, headers, json_data, retries=3):
 async def login_and_get_token(session: aiohttp.ClientSession):
     global CURRENT_TOKEN
     json_data = {
-        'username': '959680090540',
-        'pwd': 'Mitheint11',
+        'username': USERNAME, 
+        'pwd': PASSWORD,
         'phonetype': 1,
         'logintype': 'mobile',
         'packId': '',
         'deviceId': 'b9b753a9f874897574d7fa72ff84374c',
         'language': 7,
-        'random': 'e98c09a1f15949f99403c27d9fc45dfa',
-        'signature': 'C5118DA49746AF4504F6C4967C5C50B4',
-        'timestamp': 1773236871,
+        'random': LOGIN_RANDOM,
+        'signature': LOGIN_SIGNATURE,
+        'timestamp': LOGIN_TIMESTAMP,
     }
     data = await fetch_with_retry(session, 'https://6lotteryapi.com/api/webapi/Login', BASE_HEADERS, json_data)
     if data and data.get('code') == 0:
         token_str = data.get('data', {}) if isinstance(data.get('data'), str) else data.get('data', {}).get('token', '')
         CURRENT_TOKEN = f"Bearer {token_str}"
-        print("✅ Login အောင်မြင်ပါသည်။ Token အသစ် ရရှိပါပြီ。\n")
+        print("✅ 6WIN ဆာဗာသို့ Login အောင်မြင်ပါသည်။\n")
         return True
     return False
 
@@ -180,16 +189,15 @@ def casino_memory_predict(history_docs, current_lose_streak):
     return final_pred, final_prob, logic_used
 
 # ==========================================
-# 🎨 5. DYNAMIC GRAPH GENERATOR 
+# 🎨 5. DYNAMIC GRAPH GENERATOR (FIXED SCALE)
 # ==========================================
 def generate_winrate_chart(predictions):
     wins, losses = 0, 0
     history_wr, bar_colors, dots_list = [], [], []
     
-    # 💡 [FIX] နောက်ဆုံး ၂၀ ပွဲကိုသာ ကန့်သတ်ယူမည်
-    latest_preds = list(reversed(predictions))[-20:]
+    latest_20_preds = list(reversed(predictions))[-20:]
     
-    for p in latest_preds: 
+    for p in latest_20_preds: 
         if 'WIN' in p.get('win_lose', ''):
             wins += 1
             bar_colors.append('#26a69a') 
@@ -206,8 +214,6 @@ def generate_winrate_chart(predictions):
 
     fig, ax = plt.subplots(figsize=(8, 5.5), facecolor='#1e222d') 
     ax.set_facecolor('#1e222d')
-    
-    # 💡 [FIX] X-axis ကို (၂၀) ပွဲစာ အသေသတ်မှတ်ပေးလိုက်ပါပြီ
     ax.set_xlim(-0.5, 19.5)
     
     if total_played > 0:
@@ -226,7 +232,7 @@ def generate_winrate_chart(predictions):
     ax.spines['bottom'].set_color('#363a45')
     ax.grid(axis='y', color='#363a45', linestyle='-', linewidth=0.5)
     
-    plt.suptitle("WINRATE TRACKING", color='white', fontsize=20, fontweight='bold', y=0.96)
+    plt.suptitle("6WIN (30s) WINRATE TRACKING", color='white', fontsize=20, fontweight='bold', y=0.96)
     plt.figtext(0.5, 0.05, f"{win_rate}%", color='white', fontsize=30, fontweight='bold', ha='center')
     plt.figtext(0.38, 0.0, f"WINS: {wins}", color='#26a69a', fontsize=14, ha='center', fontweight='bold')
     plt.figtext(0.62, 0.0, f"LOSSES: {losses}", color='#ef5350', fontsize=14, ha='center', fontweight='bold')
@@ -238,7 +244,7 @@ def generate_winrate_chart(predictions):
         dot_ax.set_axis_off()
         dot_ax.set_xlim(0, 20) 
         dot_ax.set_ylim(0, 1)
-        colors = dots_list
+        colors = dots_list[-20:]
         n_dots = len(colors)
         start_x = (20 - n_dots) / 2.0
         x_coords = [start_x + i + 0.5 for i in range(n_dots)]
@@ -267,7 +273,9 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
 
     json_data = {
         'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
-        'random': 'ff5adfece70a45c2b5152b2526b50a3a', 'signature': '40D308D7D2D214B247B6CF480E1FB85D', 'timestamp': 1773237062,
+        'random': DATA_RANDOM,
+        'signature': DATA_SIGNATURE,
+        'timestamp': DATA_TIMESTAMP,
     }
 
     data = await fetch_with_retry(session, 'https://6lotteryapi.com/api/webapi/GetNoaverageEmerdList', headers, json_data)
@@ -326,9 +334,6 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
     if current_session_count >= 20: 
         SESSION_START_ISSUE = next_issue
     
-    # ==============================================================
-    # 🧠 CALCULATE LOSE STREAK & GET PREDICTION
-    # ==============================================================
     recent_preds_cursor = predictions_collection.find({"win_lose": {"$ne": None}}).sort("issue_number", -1).limit(10)
     recent_preds = await recent_preds_cursor.to_list(length=10)
     
@@ -387,12 +392,11 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
         table_str += f"{iss_short:<10}| {res_str:<7} | {wl_str}\n"
     table_str += "</code>"
 
-    # ⚡ ချက်ချင်းအချိန်ဆွဲယူမည့် Function
     def get_realtime_caption():
         sec_left = 30 - (int(time.time()) % 30)
-        if sec_left == 30: sec_left = 0 # ၃၀ စက္ကန့်ပြည့်ချိန်တွင် 0s ဟုပြရန်
+        if sec_left == 30: sec_left = 0 
         return (
-            f"<b>6 Lottery 30 SECONDS</b>\n"
+            f"<b>🏆 6LOTTEY (30 SECONDS)</b>\n"
             f"⏰ Next Result In: <b>{sec_left}s</b>\n\n"
             f"{table_str}\n"
             f"🅿️ <b>Period:</b> {next_issue[:3]}**{next_issue[-4:]}\n"
@@ -401,13 +405,11 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
     
     current_time = time.time()
     try:
-        # ပွဲသစ်ထွက်ချိန်တွင် ပုံအရင်ဆွဲမည် (အချိန်ယူသည်)
         if is_new_issue or not MAIN_MESSAGE_ID:
             img_buf = await asyncio.to_thread(generate_winrate_chart, session_preds)
-            unique_filename = f"winrate_chart_{int(current_time)}.png"
+            unique_filename = f"6win30s_chart_{int(current_time)}.png"
             photo = BufferedInputFile(img_buf.read(), filename=unique_filename)
             
-            # ပုံဆွဲပြီး၍ Telegram ဆီ ပို့ခါနီးအချိန်ရောက်မှသာ လက်ရှိစက္ကန့်ကို တွက်ချက်မည် (Zero-Latency)
             tg_caption = get_realtime_caption()
             
             if MAIN_MESSAGE_ID:
@@ -420,10 +422,8 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
             LAST_CAPTION_EDIT_TIME = time.time() 
             
         else:
-            # စက္ကန့်လျော့နေချိန်တွင် ၁ စက္ကန့်ခြားတိုင်း အတိအကျ Update လုပ်မည်
             if current_time - LAST_CAPTION_EDIT_TIME >= 1.0:
                 if MAIN_MESSAGE_ID:
-                    # Update လုပ်ခါနီး အတိအကျအချိန်ကို ယူမည်
                     tg_caption = get_realtime_caption()
                     await bot.edit_message_caption(chat_id=TELEGRAM_CHANNEL_ID, message_id=MAIN_MESSAGE_ID, caption=tg_caption, parse_mode="HTML")
                 LAST_CAPTION_EDIT_TIME = time.time()
@@ -436,23 +436,29 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
         elif "message to edit not found" in str(e):
             MAIN_MESSAGE_ID = None 
 
-# ==========================================
-# 🔄 6. BACKGROUND TASK
-# ==========================================
 async def auto_broadcaster():
+    global LAST_HEARTBEAT
     await init_db() 
     async with aiohttp.ClientSession() as session:
         await login_and_get_token(session)
         while True:
-            await check_game_and_predict(session)
+            try:
+                if time.time() - LAST_HEARTBEAT > 10:
+                    LAST_HEARTBEAT = time.time()
+                await check_game_and_predict(session)
+            except Exception: pass
             await asyncio.sleep(0.5) 
 
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message):
-    await message.reply("👋 မင်္ဂလာပါ။ စနစ်က Zero-Latency Timer ဖြင့် လုံးဝတိကျစွာ အလုပ်လုပ်နေပါပြီ။")
+    welcome_text = (
+        "👋 မင်္ဂလာပါ။ 6WIN GO (30 Seconds) Bot မှ ကြိုဆိုပါတယ်။\n\n"
+        "စနစ်သည် Code အတွင်း ထည့်သွင်းထားသော (Hardcoded) သော့များဖြင့်သာ အလုပ်လုပ်နေပါသည်။ သော့သက်တမ်း ကုန်ဆုံးသွားပါက Server ကို Manual ပြန်တင်ပေးပါ။"
+    )
+    await message.reply(welcome_text)
 
 async def main():
-    print("🚀 Aiogram Bigwin Bot (Zero-Latency Timer Edition) စတင်နေပါပြီ...\n")
+    print("🚀 Aiogram 6WIN Bot (30 Seconds Edition) စတင်နေပါပြီ...\n")
     await bot.delete_webhook(drop_pending_updates=True)
     asyncio.create_task(auto_broadcaster())
     await dp.start_polling(bot)
