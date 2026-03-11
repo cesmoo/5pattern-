@@ -58,7 +58,7 @@ LAST_PROCESSED_ISSUE = None
 MAIN_MESSAGE_ID = None 
 SESSION_START_ISSUE = None 
 LAST_CAPTION_EDIT_TIME = 0 
-CURRENT_BALANCE = "0.00" # 💰 ငွေလက်ကျန်ပြသမည့် Variable အသစ်
+CURRENT_BALANCE = "0.00" 
 
 BASE_HEADERS = {
     'authority': 'api.bigwinqaz.com',
@@ -75,18 +75,20 @@ async def init_db():
         await predictions_collection.create_index("issue_number", unique=True)
         print("🗄 MongoDB ချိတ်ဆက်မှု အောင်မြင်ပါသည်။ (💎 TRX PRO Full API Edition)")
     except Exception as e:
-        pass
+        print(f"❌ MongoDB Error: {e}")
 
 # ==========================================
-# 🔑 3. ASYNC API FUNCTIONS (NEW APIS ADDED)
+# 🔑 3. ASYNC API FUNCTIONS
 # ==========================================
 async def fetch_with_retry(session, url, headers, json_data, retries=3):
     for attempt in range(retries):
         try:
             async with session.post(url, headers=headers, json=json_data, timeout=10) as response:
                 return await response.json()
-        except Exception:
-            if attempt == retries - 1: return None
+        except Exception as e:
+            if attempt == retries - 1:
+                print(f"⚠️ API Fetch Error: {e}")
+                return None
             await asyncio.sleep(1)
 
 async def login_and_get_token(session: aiohttp.ClientSession):
@@ -109,9 +111,10 @@ async def login_and_get_token(session: aiohttp.ClientSession):
         CURRENT_TOKEN = f"Bearer {token_str}"
         print("✅ Login အောင်မြင်ပါသည်။ Token အသစ် ရရှိပါပြီ。\n")
         return True
+    else:
+        print(f"❌ Login Failed: {data}")
     return False
 
-# 💰 [API အသစ်] Balance စစ်ဆေးခြင်း
 async def get_account_balance(session: aiohttp.ClientSession, headers):
     url = 'https://api.bigwinqaz.com/api/webapi/GetBalance'
     json_data = {
@@ -128,7 +131,6 @@ async def get_account_balance(session: aiohttp.ClientSession, headers):
         return str(data_val)
     return CURRENT_BALANCE
 
-# 🎯 [API အသစ်] လာမည့် ပွဲစဉ်အမှတ်ကို အတိအကျ ယူခြင်း
 async def get_current_issue(session: aiohttp.ClientSession, headers):
     url = 'https://api.bigwinqaz.com/api/webapi/GetTRXGameIssue'
     json_data = {
@@ -253,7 +255,7 @@ def generate_winrate_chart(predictions):
     ax.spines['bottom'].set_color('#363a45')
     ax.grid(axis='y', color='#363a45', linestyle='-', linewidth=0.5)
     
-    plt.suptitle("TRX WINRATE TRACKING", color='white', fontsize=25, fontweight='bold', y=0.96)
+    plt.suptitle("TRX WINRATE TRACKING", color='white', fontsize=20, fontweight='bold', y=0.96)
     plt.figtext(0.5, 0.05, f"{win_rate}%", color='white', fontsize=30, fontweight='bold', ha='center')
     plt.figtext(0.38, 0.0, f"WINS: {wins}", color='#26a69a', fontsize=14, ha='center', fontweight='bold')
     plt.figtext(0.62, 0.0, f"LOSSES: {losses}", color='#ef5350', fontsize=14, ha='center', fontweight='bold')
@@ -292,7 +294,6 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
     headers = BASE_HEADERS.copy()
     headers['authorization'] = CURRENT_TOKEN
 
-    # 📊 ရလဒ်ဟောင်းများကို ဆွဲယူခြင်း
     json_data_list = {
         'pageSize': 10, 'pageNo': 1, 'typeId': 13, 'language': 7,
         'random': 'bd4aeeacf54b497f8a9b510c03d7d14c', 'signature': '3E42D2051B49422583016B8438AA7DD9', 'timestamp': int(time.time()),
@@ -323,7 +324,6 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
         if not SESSION_START_ISSUE:
             SESSION_START_ISSUE = latest_issue
             
-        # 💰 ပွဲစဉ်အသစ်ရောက်တိုင်း Balance ကိုပါ တစ်ခါတည်း လှမ်းစစ်မည်
         CURRENT_BALANCE = await get_account_balance(session, headers)
         
         await history_collection.update_one(
@@ -344,7 +344,6 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
                 {"$set": {"actual_size": latest_size, "actual_number": latest_number, "win_lose": win_lose_status}}
             )
 
-    # 🎯 နောက်ပွဲစဉ်ကို API မှတစ်ဆင့် တိုက်ရိုက်ဆွဲယူခြင်း (ပိုမိုတိကျစေရန်)
     next_issue = await get_current_issue(session, headers)
     if not next_issue: 
         next_issue = str(int(latest_issue) + 1)
@@ -418,13 +417,12 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
         table_str += f"{iss_short:<10}| {res_str:<7} | {wl_str}\n"
     table_str += "</code>"
 
-    # ⚡ Zero-Latency Function
     def get_realtime_caption():
         sec_left = 60 - (int(time.time()) % 60)
         if sec_left == 60: sec_left = 0
         return (
             f"<b>💎 TRX WIN GO (60s)</b>\n"
-           # f"💰 <b>Balance:</b> {CURRENT_BALANCE} 🪙\n"
+            #f"💰 <b>Balance:</b> {CURRENT_BALANCE} 🪙\n"
             f"⏰ Next Result In: <b>{sec_left}s</b>\n\n"
             f"{table_str}\n"
             f"🅿️ <b>Period:</b> {next_issue[:3]}**{next_issue[-4:]}\n"
@@ -432,7 +430,7 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
             f"📈 <b>ဖြစ်နိုင်ခြေ:</b> {final_prob}%\n"
             #f"💡 <b>အကြောင်းပြချက်:</b>\n"
             #f"{reason}\n"
-            #f"━━━━━━━━━━━━━━━━━━\n"
+           # f"━━━━━━━━━━━━━━━━━━\n"
             #f"{bet_advice}"
         )
     
@@ -448,9 +446,11 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
             if MAIN_MESSAGE_ID:
                 media = InputMediaPhoto(media=photo, caption=tg_caption, parse_mode="HTML")
                 await bot.edit_message_media(chat_id=TELEGRAM_CHANNEL_ID, message_id=MAIN_MESSAGE_ID, media=media)
+                print(f"✅ Image Updated for {next_issue}")
             else:
                 msg = await bot.send_photo(chat_id=TELEGRAM_CHANNEL_ID, photo=photo, caption=tg_caption)
                 MAIN_MESSAGE_ID = msg.message_id
+                print(f"✅ New Message Sent for {next_issue}")
             
             LAST_CAPTION_EDIT_TIME = time.time() 
             
@@ -462,12 +462,18 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
                 LAST_CAPTION_EDIT_TIME = time.time()
                 
     except TelegramRetryAfter as e:
+        print(f"⚠️ Telegram Spam Limit! Waiting for {e.retry_after} seconds.")
         LAST_CAPTION_EDIT_TIME = time.time() + e.retry_after
     except TelegramBadRequest as e:
         if "message is not modified" in str(e):
             pass 
         elif "message to edit not found" in str(e):
+            print("⚠️ Message deleted in channel. Will send a new one.")
             MAIN_MESSAGE_ID = None 
+    except Exception as e:
+        print(f"❌ Telegram Error (Send/Edit): {e}")
+        if "chat not found" in str(e).lower() or "bot is not a member" in str(e).lower() or "forbidden" in str(e).lower():
+            print("⚠️ အရေးကြီး- Channel ID မှားနေသည် (သို့) Bot ကို Admin မပေးထားပါ။")
 
 # ==========================================
 # 🔄 6. BACKGROUND TASK
@@ -477,12 +483,15 @@ async def auto_broadcaster():
     async with aiohttp.ClientSession() as session:
         await login_and_get_token(session)
         while True:
-            await check_game_and_predict(session)
+            try:
+                await check_game_and_predict(session)
+            except Exception as e:
+                print(f"⚠️ System Logic Error: {e}")
             await asyncio.sleep(0.5) 
 
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message):
-    await message.reply("👋 မင်္ဂလာပါ။ စနစ်က Balance API အပါအဝင် TRX Win Go စနစ်အပြည့်အစုံဖြင့် အလုပ်လုပ်နေပါပြီ။")
+    await message.reply("👋 မင်္ဂလာပါ။ စနစ်က TRX Win Go အတွက် Deep Memory System ဖြင့် အလုပ်လုပ်နေပါပြီ။")
 
 async def main():
     print("🚀 Aiogram TRX Win Go Bot (Full API Integration) စတင်နေပါပြီ...\n")
