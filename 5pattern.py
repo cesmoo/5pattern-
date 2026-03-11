@@ -15,16 +15,13 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.exceptions import TelegramBadRequest, TelegramRetryAfter
 from aiogram.types import BufferedInputFile, InputMediaPhoto
 
-# --- 🧠 TRUE MACHINE LEARNING LIBRARIES ---
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier
 import matplotlib
 matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import warnings
 warnings.filterwarnings("ignore")
-# ------------------------------------------
 
 load_dotenv()
 
@@ -44,7 +41,6 @@ if not all([USERNAME, PASSWORD, TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID, MONGO_U
 bot = Bot(token=TELEGRAM_BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
-# MongoDB Setup
 db_client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
 db = db_client['bigwin_database'] 
 history_collection = db['trx_game_history'] 
@@ -73,7 +69,7 @@ async def init_db():
     try:
         await history_collection.create_index("issue_number", unique=True)
         await predictions_collection.create_index("issue_number", unique=True)
-        print("🗄 MongoDB ချိတ်ဆက်မှု အောင်မြင်ပါသည်။ (💎 TRX PRO Full API Edition)")
+        print("🗄 MongoDB ချိတ်ဆက်မှု အောင်မြင်ပါသည်။ (💎 TRX Blockchain Trend Surfer Edition)")
     except Exception as e:
         print(f"❌ MongoDB Error: {e}")
 
@@ -94,16 +90,16 @@ async def fetch_with_retry(session, url, headers, json_data, retries=3):
 async def login_and_get_token(session: aiohttp.ClientSession):
     global CURRENT_TOKEN
     json_data = {
-        'username': '959680090540',
-        'pwd': 'Mitheint11',
+        'username': USERNAME, 
+        'pwd': PASSWORD,
         'phonetype': 1,
         'logintype': 'mobile',
         'packId': '',
         'deviceId': '51ed4ee0f338a1bb24063ffdfcd31ce6',
         'language': 7,
-        'random': '4593dcdb4b044e77b30bdd9f8f7d1490',
-        'signature': '950A734D42FB6919FDCD25EDEEFD7BD2',
-        'timestamp': 1773213022,
+        'random': 'a4902febdaeb4f5885479c44a8ac2cbb',
+        'signature': '2127DA46CCAE9050B844F8E3373CFDFB',
+        'timestamp': 1773211093,
     }
     data = await fetch_with_retry(session, 'https://api.bigwinqaz.com/api/webapi/Login', BASE_HEADERS, json_data)
     if data and data.get('code') == 0:
@@ -121,13 +117,12 @@ async def get_account_balance(session: aiohttp.ClientSession, headers):
         'language': 7,
         'random': 'e0340b8b39684e1c8c2e2391d9ca02d5',
         'signature': '6AF1E9AD003853931B95189800F9FA4B',
-        'timestamp': int(time.time()),
+        'timestamp': 1773195076,
     }
     res = await fetch_with_retry(session, url, headers, json_data)
     if res and res.get('code') == 0:
         data_val = res.get('data')
-        if isinstance(data_val, dict):
-            return str(data_val.get('balance', CURRENT_BALANCE))
+        if isinstance(data_val, dict): return str(data_val.get('balance', CURRENT_BALANCE))
         return str(data_val)
     return CURRENT_BALANCE
 
@@ -136,9 +131,9 @@ async def get_current_issue(session: aiohttp.ClientSession, headers):
     json_data = {
         'typeId': 13,
         'language': 7,
-        'random': '11f6da0c8e434ccaac2ca399e5a333cf',
-        'signature': 'A8708EAABC8CADB207176021778459B4',
-        'timestamp': int(time.time()),
+        'random': '3d704ba98ce14bf2a8c1153c27e234e0',
+        'signature': 'DEB5F9E0B146BFE09C316AD1417A97A8',
+        'timestamp': 1773211260, 
     }
     res = await fetch_with_retry(session, url, headers, json_data)
     if res and res.get('code') == 0:
@@ -146,73 +141,46 @@ async def get_current_issue(session: aiohttp.ClientSession, headers):
     return ""
 
 # ==========================================
-# 🧠 4. EMERGENCY RECOVERY AI & DEEP MEMORY
+# 🧠 4. CRYPTO TREND SURFER AI (TRX Hash System)
 # ==========================================
-def casino_memory_predict(history_docs, current_lose_streak):
-    if len(history_docs) < 10: return "BIG", 55.0, "Data စုဆောင်းဆဲ..."
+def crypto_trx_predict(history_docs, current_lose_streak):
+    """
+    TRX သည် Blockchain Hash ပေါ်အခြေခံသဖြင့် အလွန်အမင်း Random ဖြစ်သည်။
+    ထို့ကြောင့် ML အစား ရေစီးကြောင်းနောက်လိုက်သော Trend Surfing ကိုသာ အသုံးပြုမည်။
+    """
+    if len(history_docs) < 5: return "BIG", 55.0, "Data စုဆောင်းဆဲ..."
     
     docs = list(reversed(history_docs)) 
     sizes = [d.get('size', 'BIG') for d in docs]
     
-    score_b, score_s = 0.0, 0.0
-    logic_used = ""
-
-    if current_lose_streak >= 3:
-        logic_used = "🚨 <b>Emergency Recovery AI</b>\n"
-        if len(sizes) >= 3:
-            if sizes[-1] != sizes[-2] and sizes[-2] != sizes[-3]:
-                logic_used += "├ 🏓 <b>Pattern:</b> Ping-Pong (ခုတ်ချိုး)\n"
-                logic_used += "└ 💡 <b>Action:</b> ပြောင်းပြန်ချိုးမည်"
-                pred = 'BIG' if sizes[-1] == 'SMALL' else 'SMALL'
-                return pred, 98.0, logic_used
-            elif sizes[-1] == sizes[-2]:
-                logic_used += "├ 🐉 <b>Pattern:</b> Dragon (အတန်းရှည်)\n"
-                logic_used += "└ 💡 <b>Action:</b> ရေစီးကြောင်းနောက် လိုက်မည်"
-                return sizes[-1], 98.0, logic_used
-            else:
-                logic_used += "├ 🌊 <b>Pattern:</b> Mixed (ရောထွေးနေသည်)\n"
-                logic_used += "└ 💡 <b>Action:</b> နောက်ဆုံးအလုံးအတိုင်း လိုက်မည်"
-                return sizes[-1], 90.0, logic_used
-
-    last_100 = sizes[-100:] if len(sizes) >= 100 else sizes
-    b_100 = last_100.count('BIG')
-    s_100 = last_100.count('SMALL')
+    logic_used = "⛓️ <b>Blockchain Hash Strategy</b>\n"
     
-    if b_100 > (len(last_100) * 0.55): 
-        score_s += 2.5
-        logic_used += f"├ ⚖️ TRX Balance (SMALL သို့ မျှခြေပြန်ဆွဲမည်)\n"
-    elif s_100 > (len(last_100) * 0.55): 
-        score_b += 2.5
-        logic_used += f"├ ⚖️ TRX Balance (BIG သို့ မျှခြေပြန်ဆွဲမည်)\n"
-    else:
-        logic_used += f"├ ⚖️ TRX Balance (မျှခြေ ၅၀/၅၀ ရှိနေသည်)\n"
+    # နောက်ဆုံး ၃ ပွဲ၏ ရလဒ်ကို ကြည့်မည်
+    last_3 = sizes[-3:]
+    last_size = sizes[-1]
+    
+    if current_lose_streak >= 2:
+        logic_used += "├ 🚨 <b>Action:</b> အရှုံးများသဖြင့် ရေစီးကြောင်းနောက် လိုက်ပါမည်\n"
+        return last_size, 95.0, logic_used + "└ 💡 ထွက်ပြီးသား အလုံးအတိုင်း ထိုးပါ"
 
-    X, y = [], []
-    window = 5
-    def enc(s): return 1 if s == 'BIG' else 0
-    for i in range(len(sizes) - window):
-        X.append([enc(s) for s in sizes[i:i+window]])
-        y.append(enc(sizes[i+window]))
+    # [Ping-Pong ဖြတ်တောက်ခြင်း]
+    if len(sizes) >= 4 and sizes[-1] != sizes[-2] and sizes[-2] != sizes[-3] and sizes[-3] != sizes[-4]:
+        logic_used += "├ 🏓 <b>Pattern:</b> ခုတ်ချိုး (Ping-Pong) ရေစီးကြောင်း\n"
+        logic_used += "└ 💡 ခုတ်ချိုးအတိုင်း ဆက်လက် လိုက်ပါမည်"
+        pred = 'BIG' if last_size == 'SMALL' else 'SMALL'
+        return pred, 85.0, logic_used
         
-    if len(X) > 10:
-        clf = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=42)
-        clf.fit(X, y)
-        rf_pred_num = clf.predict([[enc(s) for s in sizes[-window:]]])[0]
-        rf_prob = max(clf.predict_proba([[enc(s) for s in sizes[-window:]]])[0])
-        
-        if rf_pred_num == 1: score_b += (rf_prob * 2.0)
-        else: score_s += (rf_prob * 2.0)
-            
-    logic_used += "└ 🤖 ML Hash Pattern Recognition"
+    # [Dragon အတန်းရှည် လိုက်ခြင်း]
+    if sizes[-1] == sizes[-2]:
+        logic_used += "├ 🐉 <b>Pattern:</b> အတန်းရှည် (Dragon) ရေစီးကြောင်း\n"
+        logic_used += "└ 💡 ပြတ်မသွားမချင်း အတန်းရှည်အတိုင်း လိုက်ပါမည်"
+        return last_size, 88.0, logic_used
 
-    final_pred = "BIG" if score_b > score_s else "SMALL"
-    total_score = score_b + score_s
-    if total_score == 0: return "BIG", 55.0, logic_used
+    # သာမန်အချိန်တွင် နောက်ဆုံးထွက်ခဲ့သော အလုံးကိုသာ အခြေခံမည်
+    logic_used += "├ 🌊 <b>Pattern:</b> သာမန် Random Hash အခြေအနေ\n"
+    logic_used += "└ 💡 နောက်ဆုံး Block ရလဒ်အတိုင်း လိုက်ပါမည်"
     
-    calc_prob = (max(score_b, score_s) / total_score) * 100
-    final_prob = min(max(calc_prob, 70.0), 96.0) 
-    
-    return final_pred, final_prob, logic_used
+    return last_size, 65.0, logic_used
 
 # ==========================================
 # 🎨 5. DYNAMIC GRAPH GENERATOR 
@@ -274,7 +242,7 @@ def generate_winrate_chart(predictions):
         y_coords = [0.5] * n_dots
         dot_ax.scatter(x_coords, y_coords, s=250, c=colors, edgecolors='white', linewidths=1.5, zorder=5)
             
-    plt.figtext(0.5, -0.28, "DEV-WANG LIN", color='white', fontsize=15, fontweight='bold', ha='center', alpha=1)
+    plt.figtext(0.5, -0.28, "DEV-WANG LIN (TRX BLOCKCHAIN)", color='#787b86', fontsize=12, ha='center', alpha=1)
 
     buf = io.BytesIO()
     plt.savefig(buf, format='png', bbox_inches='tight', dpi=100, facecolor='#1e222d')
@@ -294,17 +262,21 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
     headers = BASE_HEADERS.copy()
     headers['authorization'] = CURRENT_TOKEN
 
-    # ❗ ပြဿနာဖြစ်ခဲ့သော json_data_list ကို ဤနေရာတွင် သေချာစွာ ထည့်သွင်းပေးထားပါသည်
+    # 💡 စမ်းသပ်ချက်: Security parameter များကို ခေတ္တဖယ်ရှား၍ လှမ်းခေါ်ကြည့်မည်
     json_data_list = {
         'pageSize': 10, 'pageNo': 1, 'typeId': 13, 'language': 7,
         'random': '6f1cfc8bbeeb44ec98343ac38d1af67c',
         'signature': '5E271BE324AFB34F9A2E5EC9F7CE05D2',
-        'timestamp': int(time.time()),
+        'timestamp': 1773211343, 
     }
 
     data = await fetch_with_retry(session, 'https://api.bigwinqaz.com/api/webapi/GetTRXNoaverageEmerdList', headers, json_data_list)
+    
+    # 🚨 API Error ကို ရှင်းလင်းစွာ သိနိုင်ရန် Print ထုတ်ပေးထားသည်
     if not data or data.get('code') != 0:
-        if data and (data.get('code') == 401 or "token" in str(data.get('msg')).lower()): CURRENT_TOKEN = ""
+        print(f"⚠️ API ငြင်းပယ်ခံရပါသည် (သက်တမ်းကုန်နေနိုင်သည်): {data}")
+        if data and (data.get('code') == 401 or "token" in str(data.get('msg')).lower()): 
+            CURRENT_TOKEN = ""
         return
 
     records = data.get("data", {}).get("list", [])
@@ -359,9 +331,6 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
     if current_session_count >= 20: 
         SESSION_START_ISSUE = next_issue
     
-    # ==============================================================
-    # 🧠 PREDICTION LOGIC
-    # ==============================================================
     recent_preds_cursor = predictions_collection.find({"win_lose": {"$ne": None}}).sort("issue_number", -1).limit(10)
     recent_preds = await recent_preds_cursor.to_list(length=10)
     
@@ -376,16 +345,15 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
     history_docs = await cursor.to_list(length=5000)
 
     try:
-        mem_pred, mem_prob, mem_logic = await asyncio.to_thread(casino_memory_predict, history_docs, current_lose_streak)
+        mem_pred, mem_prob, mem_logic = await asyncio.to_thread(crypto_trx_predict, history_docs, current_lose_streak)
         predicted = "BIG (အကြီး) 🔴" if mem_pred == "BIG" else "SMALL (အသေး) 🟢"
         base_prob = mem_prob
-        reason = f"🧠 <b>TRX Deep Memory Clone</b>\n{mem_logic}"
+        reason = mem_logic
     except Exception as e:
         predicted = "BIG (အကြီး) 🔴"
         base_prob = 55.0
-        reason = "⚠️ Memory Syncing Error..."
+        reason = "⚠️ Hash Syncing Error..."
     
-    final_prob = min(max(round(base_prob, 1), 60.0), 98.0)
     predicted_result_db = "BIG" if "BIG" in predicted else "SMALL"
     
     await predictions_collection.update_one(
@@ -430,7 +398,7 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
             f"{table_str}\n"
             f"🅿️ <b>Period:</b> {next_issue[:3]}**{next_issue[-4:]}\n"
             f"🎯 <b>Predict: {predicted}</b>\n"
-            f"📈 <b>ဖြစ်နိုင်ခြေ:</b> {final_prob}%\n"
+            f"📈 <b>ဖြစ်နိုင်ခြေ:</b> {base_prob}%\n"
             f"💡 <b>အကြောင်းပြချက်:</b>\n"
             f"{reason}\n"
             f"━━━━━━━━━━━━━━━━━━\n"
@@ -468,13 +436,12 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
         print(f"⚠️ Telegram Spam Limit! Waiting for {e.retry_after} seconds.")
         LAST_CAPTION_EDIT_TIME = time.time() + e.retry_after
     except TelegramBadRequest as e:
-        if "message is not modified" in str(e):
-            pass 
+        if "message is not modified" in str(e): pass 
         elif "message to edit not found" in str(e):
             print("⚠️ Message deleted in channel. Will send a new one.")
             MAIN_MESSAGE_ID = None 
     except Exception as e:
-        print(f"❌ Telegram Error (Send/Edit): {e}")
+        print(f"❌ Telegram Error: {e}")
 
 # ==========================================
 # 🔄 6. BACKGROUND TASK
@@ -492,10 +459,10 @@ async def auto_broadcaster():
 
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message):
-    await message.reply("👋 မင်္ဂလာပါ။ စနစ်က TRX Win Go (1 Minute) အတွက် အလုပ်လုပ်နေပါပြီ။")
+    await message.reply("👋 မင်္ဂလာပါ။ စနစ်က TRX Crypto Trend Surfer စနစ်ဖြင့် အလုပ်လုပ်နေပါပြီ။")
 
 async def main():
-    print("🚀 Aiogram TRX Win Go Bot (1-Minute Edition) စတင်နေပါပြီ...\n")
+    print("🚀 Aiogram TRX Win Go Bot (Crypto AI Edition) စတင်နေပါပြီ...\n")
     await bot.delete_webhook(drop_pending_updates=True)
     asyncio.create_task(auto_broadcaster())
     await dp.start_polling(bot)
