@@ -103,7 +103,7 @@ async def login_and_get_token(session: aiohttp.ClientSession):
         'language': 7,
         'random': 'a4902febdaeb4f5885479c44a8ac2cbb',
         'signature': '2127DA46CCAE9050B844F8E3373CFDFB',
-        'timestamp': int(time.time()),
+        'timestamp': 1773211093,
     }
     data = await fetch_with_retry(session, 'https://api.bigwinqaz.com/api/webapi/Login', BASE_HEADERS, json_data)
     if data and data.get('code') == 0:
