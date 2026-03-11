@@ -94,7 +94,7 @@ async def fetch_with_retry(session, url, headers, json_data, retries=3):
 async def login_and_get_token(session: aiohttp.ClientSession):
     global CURRENT_TOKEN
     json_data = {
-        'username': '959770069402', 
+        'username': '959680090540',
         'pwd': 'Mitheint11',
         'phonetype': 1,
         'logintype': 'mobile',
@@ -103,7 +103,7 @@ async def login_and_get_token(session: aiohttp.ClientSession):
         'language': 7,
         'random': '452fa309995244de92103c0afbefbe9a',
         'signature': '202C655177E9187D427A26F3CDC00A52',
-        'timestamp': int(time.time()),
+        'timestamp': 1773021618,
     }
     data = await fetch_with_retry(session, 'https://api.bigwinqaz.com/api/webapi/Login', BASE_HEADERS, json_data)
     if data and data.get('code') == 0:
