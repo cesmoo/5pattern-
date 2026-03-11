@@ -55,11 +55,7 @@ predictions_collection = db['predictions']
 # ==========================================
 CURRENT_TOKEN = ""
 LAST_PROCESSED_ISSUE = ""
-LAST_PREDICTED_ISSUE = ""
-LAST_PREDICTED_RESULT = ""
 MAIN_MESSAGE_ID = None 
-
-# --- Session Reset Variable ---
 SESSION_START_ISSUE = None # ပွဲ ၂၀ ပြည့်လျှင် ပြန်စရန်
 
 BASE_HEADERS = {
@@ -75,7 +71,7 @@ async def init_db():
     try:
         await history_collection.create_index("issue_number", unique=True)
         await predictions_collection.create_index("issue_number", unique=True)
-        print("🗄 MongoDB ချိတ်ဆက်မှု အောင်မြင်ပါသည်။ (🚀 Telegram Cache Fix Enabled)")
+        print("🗄 MongoDB ချိတ်ဆက်မှု အောင်မြင်ပါသည်။ (✅ True DB Win/Loss Checking Enabled)")
     except Exception as e:
         pass
 
@@ -234,7 +230,7 @@ def generate_winrate_chart(predictions):
 # 🚀 6. MAIN LOGIC & UI UPDATER
 # ==========================================
 async def check_game_and_predict(session: aiohttp.ClientSession):
-    global CURRENT_TOKEN, LAST_PROCESSED_ISSUE, LAST_PREDICTED_ISSUE, LAST_PREDICTED_RESULT, MAIN_MESSAGE_ID, SESSION_START_ISSUE
+    global CURRENT_TOKEN, LAST_PROCESSED_ISSUE, MAIN_MESSAGE_ID, SESSION_START_ISSUE
     
     if not CURRENT_TOKEN:
         if not await login_and_get_token(session): return
@@ -244,7 +240,7 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
 
     json_data = {
         'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
-        'random': '1ef0a7aca52b4c71975c031dda95150e', 'signature': '7D26EE375971781D1BC58B7039B409B7', 'timestamp': 1772985040,
+        'random': '', 'signature': '', 'timestamp': 1772984986,
     }
 
     data = await fetch_with_retry(session, 'https://api.bigwinqaz.com/api/webapi/GetNoaverageEmerdList', headers, json_data)
@@ -282,8 +278,11 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
             }}, upsert=True
         )
         
-        if LAST_PREDICTED_ISSUE == latest_issue:
-            is_win = (LAST_PREDICTED_RESULT == latest_size)
+        # 💡 [FIX] Database ထဲမှ အမှန်တကယ် မှတ်သားထားသော အဖြေဖြင့်သာ တိုက်စစ်မည်
+        pred_doc = await predictions_collection.find_one({"issue_number": latest_issue})
+        if pred_doc and pred_doc.get("predicted_size"):
+            db_predicted_size = pred_doc.get("predicted_size")
+            is_win = (db_predicted_size == latest_size)
             win_lose_status = "WIN ✅" if is_win else "LOSE ❌"
             await predictions_collection.update_one(
                 {"issue_number": latest_issue}, 
@@ -367,10 +366,14 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
     
     final_prob = min(max(round(base_prob, 1), 60.0), 96.0)
 
-    LAST_PREDICTED_ISSUE = next_issue
-    LAST_PREDICTED_RESULT = "BIG" if "BIG" in predicted else "SMALL"
+    predicted_result_db = "BIG" if "BIG" in predicted else "SMALL"
     
-    await predictions_collection.update_one({"issue_number": next_issue}, {"$setOnInsert": {"predicted_size": LAST_PREDICTED_RESULT}}, upsert=True)
+    # Database သို့ အဖြေကို ထည့်သွင်းမည်
+    await predictions_collection.update_one(
+        {"issue_number": next_issue}, 
+        {"$setOnInsert": {"predicted_size": predicted_result_db}}, 
+        upsert=True
+    )
 
     pred_cursor = predictions_collection.find({
         "issue_number": {"$gte": SESSION_START_ISSUE},
@@ -404,12 +407,9 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
         f"{reason}"
     )
     
-    # 🔄 ပုံနှင့်စာကို အလိုအလျောက် Update လုပ်ခြင်း (Telegram Cache ရှင်းလင်းသည့်စနစ်)
     try:
         if is_new_issue or not MAIN_MESSAGE_ID:
             img_buf = await asyncio.to_thread(generate_winrate_chart, session_preds)
-            
-            # 💡 Telegram ၏ Image Cache ပြဿနာကို ဖြေရှင်းရန် ဖိုင်နာမည်ကို Dynamic ပြောင်းလဲပေးခြင်း
             unique_filename = f"winrate_chart_{int(time.time())}.png"
             photo = BufferedInputFile(img_buf.read(), filename=unique_filename)
             
@@ -439,10 +439,10 @@ async def auto_broadcaster():
 
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message):
-    await message.reply("👋 မင်္ဂလာပါ။ စနစ်က Winrate Graph မှားယွင်းမှုများကို အလိုအလျောက် ဖြေရှင်းပေးနေပါပြီ။")
+    await message.reply("👋 မင်္ဂလာပါ။ စနစ်က Win/Loss မှားယွင်းမှုပြဿနာကို ဖြေရှင်းပြီး အမှန်ကန်ဆုံး တိုက်စစ်ပေးနေပါပြီ။")
 
 async def main():
-    print("🚀 Aiogram Bigwin Bot (Telegram Cache Fix Edition) စတင်နေပါပြီ...\n")
+    print("🚀 Aiogram Bigwin Bot (Database Sync Fix Edition) စတင်နေပါပြီ...\n")
     await bot.delete_webhook(drop_pending_updates=True)
     asyncio.create_task(auto_broadcaster())
     await dp.start_polling(bot)
