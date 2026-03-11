@@ -260,7 +260,7 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
     headers['authorization'] = CURRENT_TOKEN
 
     json_data = {
-        'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
+        'pageSize': 10, 'pageNo': 1, 'typeId': 1, 'language': 7,
         'random': 'c11f7c9905ac4778ba54049879e2c7ce', 'signature': '05E68CE68DBF9308411749E87D541A1B', 'timestamp': 1773225833,
     }
 
