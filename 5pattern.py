@@ -31,13 +31,13 @@ load_dotenv()
 # ==========================================
 # ⚙️ 1. CONFIGURATION
 # ==========================================
-USERNAME = os.getenv("BIGWIN_USERNAME")
+NAME = os.getenv("BIGWIN_USERNAME")
 PASSWORD = os.getenv("BIGWIN_PASSWORD")
 TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
 TELEGRAM_CHANNEL_ID = os.getenv("CHANNEL_ID")
 MONGO_URI = os.getenv("MONGO_URI") 
 
-if not all([USERNAME, PASSWORD, TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID, MONGO_URI]):
+if not all([NAME, PASSWORD, TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID, MONGO_URI]):
     print("❌ Error: .env ဖိုင်ထဲတွင် အချက်အလက်များ ပြည့်စုံစွာ မပါဝင်ပါ။")
     exit()
   
@@ -54,9 +54,10 @@ predictions_collection = db['predictions']
 # 🔧 2. SYSTEM VARIABLES 
 # ==========================================
 CURRENT_TOKEN = ""
-LAST_PROCESSED_ISSUE = ""
+LAST_PROCESSED_ISSUE = None
 MAIN_MESSAGE_ID = None 
-SESSION_START_ISSUE = None # ပွဲ ၂၀ ပြည့်လျှင် ပြန်စရန်
+SESSION_START_ISSUE = None 
+LAST_CAPTION_EDIT_TIME = 0 # Telegram Spam Limit မထိစေရန် မှတ်သားမည့်စနစ်
 
 BASE_HEADERS = {
     'authority': 'api.bigwinqaz.com',
@@ -71,7 +72,7 @@ async def init_db():
     try:
         await history_collection.create_index("issue_number", unique=True)
         await predictions_collection.create_index("issue_number", unique=True)
-        print("🗄 MongoDB ချိတ်ဆက်မှု အောင်မြင်ပါသည်။ (✅ True DB Win/Loss Checking Enabled)")
+        print("🗄 MongoDB ချိတ်ဆက်မှု အောင်မြင်ပါသည်။ (⚡ Instant Update System Enabled)")
     except Exception as e:
         pass
 
@@ -90,16 +91,10 @@ async def fetch_with_retry(session, url, headers, json_data, retries=3):
 async def login_and_get_token(session: aiohttp.ClientSession):
     global CURRENT_TOKEN
     json_data = {
-        'username': '959680090540',
-        'pwd': 'Mitheint11',
-        'phonetype': 1,
-        'logintype': 'mobile',
-        'packId': '',
-        'deviceId': '51ed4ee0f338a1bb24063ffdfcd31ce6',
-        'language': 7,
-        'random': '452fa309995244de92103c0afbefbe9a',
-        'signature': '202C655177E9187D427A26F3CDC00A52',
-        'timestamp': 1773021618,
+        'username': NAME, 'pwd': PASSWORD, 'phonetype': 1, 'logintype': 'mobile',
+        'packId': '', 'deviceId': '51ed4ee0f338a1bb24063ffdfcd31ce6', 'language': 7,
+        'random': 'e9a8246ddf1e4514955ada53ef50bdc0', 'signature': '872204F85DDA09B5E7BFAFD9FECC402E',
+        'timestamp': 1772984986,
     }
     data = await fetch_with_retry(session, 'https://api.bigwinqaz.com/api/webapi/Login', BASE_HEADERS, json_data)
     if data and data.get('code') == 0:
@@ -218,7 +213,7 @@ def generate_winrate_chart(predictions):
         y_coords = [0.5] * n_dots
         dot_ax.scatter(x_coords, y_coords, s=250, c=colors, edgecolors='white', linewidths=1.5, zorder=5)
             
-    plt.figtext(0.5, -0.28, "DEV-WANG LIN", color='#26a69a', fontsize=10, ha='center', alpha=0.5)
+    plt.figtext(0.5, -0.28, "DEV-WANG LIN", color='white', fontsize=20, ha='center', alpha=0.5)
 
     buf = io.BytesIO()
     plt.savefig(buf, format='png', bbox_inches='tight', dpi=100, facecolor='#1e222d')
@@ -230,7 +225,7 @@ def generate_winrate_chart(predictions):
 # 🚀 6. MAIN LOGIC & UI UPDATER
 # ==========================================
 async def check_game_and_predict(session: aiohttp.ClientSession):
-    global CURRENT_TOKEN, LAST_PROCESSED_ISSUE, MAIN_MESSAGE_ID, SESSION_START_ISSUE
+    global CURRENT_TOKEN, LAST_PROCESSED_ISSUE, MAIN_MESSAGE_ID, SESSION_START_ISSUE, LAST_CAPTION_EDIT_TIME
     
     if not CURRENT_TOKEN:
         if not await login_and_get_token(session): return
@@ -239,13 +234,8 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
     headers['authorization'] = CURRENT_TOKEN
 
     json_data = {
-        'pageSize': 10,
-        'pageNo': 1,
-        'typeId': 30,
-        'language': 7,
-        'random': 'dce1d4e948ae4f39a209e110d65afd43',
-        'signature': 'F53CF072A859F801F6B02B0C3FCDFCD6',
-        'timestamp': 1773196269,
+        'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
+        'random': '1ef0a7aca52b4c71975c031dda95150e', 'signature': '7D26EE375971781D1BC58B7039B409B7', 'timestamp': 1772985040,
     }
 
     data = await fetch_with_retry(session, 'https://api.bigwinqaz.com/api/webapi/GetNoaverageEmerdList', headers, json_data)
@@ -268,7 +258,11 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
     elif 18 <= current_hour < 24: time_context = 'NIGHT'
     else: time_context = 'LATE_NIGHT'
     
-    is_new_issue = (latest_issue != LAST_PROCESSED_ISSUE)
+    is_new_issue = False
+    if not LAST_PROCESSED_ISSUE:
+        is_new_issue = True
+    elif int(latest_issue) > int(LAST_PROCESSED_ISSUE):
+        is_new_issue = True
     
     if is_new_issue:
         LAST_PROCESSED_ISSUE = latest_issue
@@ -283,7 +277,6 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
             }}, upsert=True
         )
         
-        # 💡 [FIX] Database ထဲမှ အမှန်တကယ် မှတ်သားထားသော အဖြေဖြင့်သာ တိုက်စစ်မည်
         pred_doc = await predictions_collection.find_one({"issue_number": latest_issue})
         if pred_doc and pred_doc.get("predicted_size"):
             db_predicted_size = pred_doc.get("predicted_size")
@@ -294,15 +287,18 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
                 {"$set": {"actual_size": latest_size, "actual_number": latest_number, "win_lose": win_lose_status}}
             )
 
+    if LAST_PROCESSED_ISSUE:
+        next_issue = str(int(LAST_PROCESSED_ISSUE) + 1)
+    else:
+        next_issue = str(int(latest_issue) + 1)
+
     current_session_count = await predictions_collection.count_documents({
         "issue_number": {"$gte": SESSION_START_ISSUE}, 
         "win_lose": {"$ne": None}
     })
     
     if current_session_count >= 20: 
-        SESSION_START_ISSUE = str(int(latest_issue) + 1)
-        
-    next_issue = str(int(latest_issue) + 1)
+        SESSION_START_ISSUE = next_issue
     
     # ==============================================================
     # 🧠 PREDICTION LOGIC
@@ -348,8 +344,8 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
                     base_prob = 65.0 + (ml_prob - 50.0) * 1.5 
                     reason = (
                         f"🤖 <b>AI Machine Learning Engine</b>\n"
-                        f"├ 🔢 Number Tracking ({latest_number} ဆက်စပ်မှု)\n"
-                        f"├ ⚖️ Parity Matrix ({latest_parity} မ/စုံ)\n"
+                        f"├ 🔢 Number Tracking ({history_docs[0].get('number', 0)} ဆက်စပ်မှု)\n"
+                        f"├ ⚖️ Parity Matrix ({history_docs[0].get('parity', 'EVEN')} မ/စုံ)\n"
                         f"└ ⏰ Time Context ({time_context})"
                     )
                 else:
@@ -370,13 +366,11 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
             reason = f"🚨 <b>Adaptive Reverser Activated</b>\n└ (ကာစီနို၏ Anti-pattern ကြောင့် ပြောင်းပြန်ချိုး၍ တွက်ချက်ထားသည်)"
     
     final_prob = min(max(round(base_prob, 1), 60.0), 96.0)
-
     predicted_result_db = "BIG" if "BIG" in predicted else "SMALL"
     
-    # Database သို့ အဖြေကို ထည့်သွင်းမည်
     await predictions_collection.update_one(
         {"issue_number": next_issue}, 
-        {"$setOnInsert": {"predicted_size": predicted_result_db}}, 
+        {"$set": {"predicted_size": predicted_result_db}}, 
         upsert=True
     )
 
@@ -412,10 +406,13 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
         f"{reason}"
     )
     
+    # ⚡ [FIX] Update Speed Optimization (Instant Delivery)
+    current_time = time.time()
     try:
+        # ပွဲစဉ်အသစ် ထွက်သည့် "စက္ကန့်" တွင် အချိန်လုံးဝမဆိုင်းဘဲ ချက်ချင်း Update လုပ်မည်
         if is_new_issue or not MAIN_MESSAGE_ID:
             img_buf = await asyncio.to_thread(generate_winrate_chart, session_preds)
-            unique_filename = f"winrate_chart_{int(time.time())}.png"
+            unique_filename = f"winrate_chart_{int(current_time)}.png"
             photo = BufferedInputFile(img_buf.read(), filename=unique_filename)
             
             if MAIN_MESSAGE_ID:
@@ -424,15 +421,22 @@ async def check_game_and_predict(session: aiohttp.ClientSession):
             else:
                 msg = await bot.send_photo(chat_id=TELEGRAM_CHANNEL_ID, photo=photo, caption=tg_caption)
                 MAIN_MESSAGE_ID = msg.message_id
+            
+            LAST_CAPTION_EDIT_TIME = current_time # Update လုပ်ပြီးကြောင်း မှတ်သားမည်
+            
         else:
-            if MAIN_MESSAGE_ID:
-                await bot.edit_message_caption(chat_id=TELEGRAM_CHANNEL_ID, message_id=MAIN_MESSAGE_ID, caption=tg_caption)
+            # ပွဲစဉ်အသစ်မထွက်သေးဘဲ အချိန်စက္ကန့်လျော့နေချိန်တွင် Telegram လိုင်းမပိတ်စေရန် (၅ စက္ကန့်ခြားမှသာ) Caption ပြင်မည်
+            if current_time - LAST_CAPTION_EDIT_TIME >= 5:
+                if MAIN_MESSAGE_ID:
+                    await bot.edit_message_caption(chat_id=TELEGRAM_CHANNEL_ID, message_id=MAIN_MESSAGE_ID, caption=tg_caption)
+                LAST_CAPTION_EDIT_TIME = current_time
+                
     except TelegramBadRequest as e:
         if "message to edit not found" in str(e):
             MAIN_MESSAGE_ID = None 
 
 # ==========================================
-# 🔄 6. BACKGROUND TASK
+# 🔄 6. BACKGROUND TASK (ULTRA FAST POLLING)
 # ==========================================
 async def auto_broadcaster():
     await init_db() 
@@ -440,14 +444,15 @@ async def auto_broadcaster():
         await login_and_get_token(session)
         while True:
             await check_game_and_predict(session)
-            await asyncio.sleep(2)
+            # ⚡ ၃၀ စက္ကန့်ပြည့်တာနဲ့ ချက်ချင်းသိနိုင်ရန် (၂) စက္ကန့်အစား (၁) စက္ကန့်ဖြင့် အမြန်ဆုံးဆွဲယူမည်
+            await asyncio.sleep(1) 
 
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message):
-    await message.reply("👋 မင်္ဂလာပါ။ စနစ်က Win/Loss မှားယွင်းမှုပြဿနာကို ဖြေရှင်းပြီး အမှန်ကန်ဆုံး တိုက်စစ်ပေးနေပါပြီ။")
+    await message.reply("👋 မင်္ဂလာပါ။ စနစ်က 30-Seconds ပြည့်တာနဲ့ တန်းပြီး ချက်ချင်း Update လုပ်ပေးမည့် Instant System ဖြင့် အလုပ်လုပ်နေပါပြီ။")
 
 async def main():
-    print("🚀 Aiogram Bigwin Bot (Database Sync Fix Edition) စတင်နေပါပြီ...\n")
+    print("🚀 Aiogram Bigwin Bot (Instant Update Edition) စတင်နေပါပြီ...\n")
     await bot.delete_webhook(drop_pending_updates=True)
     asyncio.create_task(auto_broadcaster())
     await dp.start_polling(bot)
