@@ -18,4 +18,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Bot ကို စတင် Run မည့် Command
-CMD ["python", "5pattern.py"]
+CMD ["python", "aipromax.py"]
